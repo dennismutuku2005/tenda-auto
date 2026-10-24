@@ -176,14 +176,14 @@ const indexContent = `<!DOCTYPE html>
 
       <h3>Maintenance</h3>
       <div class="form-group">
-        <label for="autoRebootEn">Sys Auto Maintenance</label>
+        <label for="autoMaintenanceEn">Sys Auto Maintenance</label>
         <div>
-          <label style="font-weight: normal; width: auto;"><input type="checkbox" id="autoRebootEn" name="autoRebootEn" checked> Enable</label>
+          <label class="checkbox-inline" for="autoMaintenanceEn"><input type="checkbox" id="autoMaintenanceEn" name="autoMaintenanceEn" checked> Enable</label>
         </div>
       </div>
 
       <div style="margin-top: 30px; text-align: center;">
-        <input type="button" id="save" class="btn btn-primary" value="OK" style="width: 200px; padding: 12px;">
+        <button class="btn btn-frist btn-primary" id="submit" style="width: 200px; padding: 12px;">OK</button>
       </div>
     </form>
 
@@ -207,11 +207,11 @@ const indexContent = `<!DOCTYPE html>
       closeModal();
     });
 
-    document.getElementById('save').addEventListener('click', function() {
+    document.getElementById('submit').addEventListener('click', function() {
       var newIp = document.getElementById('lanIP').value;
       var pass = document.getElementById('newPwd').value;
       var dhcp = document.getElementById('dhcpEn').checked;
-      var autoReboot = document.getElementById('autoRebootEn').checked;
+      var autoReboot = document.getElementById('autoMaintenanceEn').checked;
 
       console.log('Saved settings:', { newIp: newIp, pass: pass, dhcp: dhcp, autoReboot: autoReboot });
 

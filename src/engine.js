@@ -137,7 +137,7 @@ export async function runTendaQuickset(page, config) {
 
 /**
  * STAGE 2: Transitions to index.html, clicks "Go to set", sets password, LAN IP, disables DHCP & Auto Maintenance,
- * and waits for login page confirmation.
+ * clicks OK (#submit), and waits for login page confirmation.
  */
 export async function runTendaAdministration(page, config) {
   const {
@@ -173,268 +173,214 @@ export async function runTendaAdministration(page, config) {
   } catch (err) {
     logger.warn(`Note modal (#goSet) check: ${err.message}`);
     await page.evaluate(() => {
-      const adminNav = document.querySelector('a[href*="system"], a[href*="adm"], #menu-adm, [data-target="system"], #sys_set');
+      const adminNav = document.querySelector('a#system, a[href*="system"], a[href*="adm"], #menu-adm');
       if (adminNav) adminNav.click();
     });
   }
 
   await sleep(1500);
 
-  // STEP 8: Set Router Login Password (auto321) & Confirm
-  logger.step(8, `Setting router login password to "${loginPassword}" (and confirming)`);
+  // STEP 8: Set Router Login Password (newPwd & cfmPwd)
+  logger.step(8, `Setting router login password to "${loginPassword}" (#newPwd & #cfmPwd)`);
 
-  const pwdElements = await page.evaluate((pass) => {
-    let newPwd = document.querySelector('#newPwd, #sysPwd, input[name="newPwd"], input[name="sysPwd"], #loginPwd, #newPassword');
-    let cfmPwd = document.querySelector('#confirmPwd, #cfmPwd, input[name="confirmPwd"], input[name="cfmPwd"], #confirmPassword');
+  // Target exact Tenda IDs: #newPwd and #cfmPwd
+  await page.waitForSelector('#newPwd, #cfmPwd', { visible: true, timeout: 15000 });
 
-    if (!newPwd || !cfmPwd) {
-      const pwds = Array.from(document.querySelectorAll('input[type="password"]')).filter((el) => {
-        return el.offsetParent !== null || window.getComputedStyle(el).display !== 'none';
-      });
-      if (pwds.length >= 2) {
-        newPwd = newPwd || pwds[0];
-        cfmPwd = cfmPwd || pwds[1];
-      } else if (pwds.length === 1) {
-        newPwd = newPwd || pwds[0];
-      }
+  await highlightElement(page, '#newPwd');
+  const newPwdEl = await page.$('#newPwd');
+  if (newPwdEl) {
+    await newPwdEl.click({ clickCount: 3 });
+    await page.keyboard.press('Backspace');
+    await newPwdEl.type(loginPassword, { delay: 40 });
+  }
+
+  await sleep(300);
+
+  await highlightElement(page, '#cfmPwd');
+  const cfmPwdEl = await page.$('#cfmPwd');
+  if (cfmPwdEl) {
+    await cfmPwdEl.click({ clickCount: 3 });
+    await page.keyboard.press('Backspace');
+    await cfmPwdEl.type(loginPassword, { delay: 40 });
+  }
+
+  // Ensure DOM values and validation events fired
+  await page.evaluate((pass) => {
+    const n = document.querySelector('#newPwd');
+    const c = document.querySelector('#cfmPwd');
+    if (n) {
+      n.value = pass;
+      n.dispatchEvent(new Event('input', { bubbles: true }));
+      n.dispatchEvent(new Event('change', { bubbles: true }));
     }
-
-    if (newPwd) {
-      newPwd.value = pass;
-      newPwd.dispatchEvent(new Event('input', { bubbles: true }));
-      newPwd.dispatchEvent(new Event('change', { bubbles: true }));
+    if (c) {
+      c.value = pass;
+      c.dispatchEvent(new Event('input', { bubbles: true }));
+      c.dispatchEvent(new Event('change', { bubbles: true }));
     }
-    if (cfmPwd) {
-      cfmPwd.value = pass;
-      cfmPwd.dispatchEvent(new Event('input', { bubbles: true }));
-      cfmPwd.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-
-    return {
-      newPwdSelector: newPwd ? (newPwd.id ? `#${newPwd.id}` : `input[name="${newPwd.name}"]`) : null,
-      cfmPwdSelector: cfmPwd ? (cfmPwd.id ? `#${cfmPwd.id}` : `input[name="${cfmPwd.name}"]`) : null
-    };
   }, loginPassword);
 
-  if (pwdElements.newPwdSelector) {
-    await highlightElement(page, pwdElements.newPwdSelector);
-    const newPwdEl = await page.$(pwdElements.newPwdSelector);
-    if (newPwdEl) {
-      await newPwdEl.click({ clickCount: 3 });
-      await page.keyboard.press('Backspace');
-      await newPwdEl.type(loginPassword, { delay: 45 });
-    }
-  }
-
-  if (pwdElements.cfmPwdSelector) {
-    await highlightElement(page, pwdElements.cfmPwdSelector);
-    const cfmPwdEl = await page.$(pwdElements.cfmPwdSelector);
-    if (cfmPwdEl) {
-      await cfmPwdEl.click({ clickCount: 3 });
-      await page.keyboard.press('Backspace');
-      await cfmPwdEl.type(loginPassword, { delay: 45 });
-    }
-  }
-
-  logger.success(`Router login password set and confirmed: "${loginPassword}"`);
+  logger.success(`Router login password set to "${loginPassword}" and confirmed in #cfmPwd.`);
   await sleep(600);
 
-  // STEP 9: Set Random LAN IP
-  logger.step(9, `Setting LAN IP to random target: "${randomLanIp}"`);
+  // STEP 9: Set Random LAN IP (#lanIP)
+  logger.step(9, `Setting LAN IP to random target: "${randomLanIp}" (#lanIP)`);
 
-  const lanElementSelector = await page.evaluate((targetIp) => {
-    let lanInput = document.querySelector('#lanIP, #lanIp, input[name="lanIP"], input[name="lanIp"], input[name="ip"], #lan_ip');
+  await page.waitForSelector('#lanIP', { visible: true, timeout: 15000 });
+  await highlightElement(page, '#lanIP');
+  const lanEl = await page.$('#lanIP');
+  if (lanEl) {
+    await lanEl.click({ clickCount: 3 });
+    await page.keyboard.press('Backspace');
+    await lanEl.type(randomLanIp, { delay: 40 });
+  }
 
-    if (!lanInput) {
-      const inputs = Array.from(document.querySelectorAll('input[type="text"]'));
-      for (const input of inputs) {
-        const parentText = input.closest('.form-group, tr, div')?.innerText || '';
-        if (/lan\s*ip/i.test(parentText) || /192\.168\./.test(input.value)) {
-          lanInput = input;
-          break;
-        }
-      }
+  await page.evaluate((targetIp) => {
+    const l = document.querySelector('#lanIP');
+    if (l) {
+      l.value = targetIp;
+      l.dispatchEvent(new Event('input', { bubbles: true }));
+      l.dispatchEvent(new Event('change', { bubbles: true }));
+      l.dispatchEvent(new Event('blur', { bubbles: true }));
     }
-
-    if (lanInput) {
-      lanInput.value = targetIp;
-      lanInput.dispatchEvent(new Event('input', { bubbles: true }));
-      lanInput.dispatchEvent(new Event('change', { bubbles: true }));
-      return lanInput.id ? `#${lanInput.id}` : `input[name="${lanInput.name}"]`;
-    }
-    return null;
   }, randomLanIp);
 
-  if (lanElementSelector) {
-    await highlightElement(page, lanElementSelector);
-    const lanEl = await page.$(lanElementSelector);
-    if (lanEl) {
-      await lanEl.click({ clickCount: 3 });
-      await page.keyboard.press('Backspace');
-      await lanEl.type(randomLanIp, { delay: 45 });
-    }
-  }
-  logger.success(`LAN IP configured: "${randomLanIp}"`);
+  logger.success(`LAN IP configured in #lanIP: "${randomLanIp}"`);
   await sleep(600);
 
-  // STEP 10: Untick DHCP Server (Off)
-  logger.step(10, 'Unticking DHCP Server (set to OFF)');
+  // STEP 10: Untick DHCP Server (#dhcpEn)
+  logger.step(10, 'Unticking DHCP Server (#dhcpEn set to OFF)');
+  await highlightElement(page, '#dhcpEn, label[for="dhcpEn"]');
 
-  const dhcpUnticked = await page.evaluate(() => {
-    let el = document.querySelector('#dhcpEn, input[name="dhcpEn"], #dhcpServer, input[name="dhcpServer"], #lanDhcp, #dhcp_en');
-
-    if (!el) {
-      const labels = Array.from(document.querySelectorAll('label, th, td, div'));
-      for (const label of labels) {
-        if (/dhcp\s*server/i.test(label.innerText) || /dhcp/i.test(label.innerText)) {
-          const container = label.closest('.form-group, tr, .control-group, div');
-          if (container) {
-            const cb = container.querySelector('input[type="checkbox"], input[type="radio"], .btn-switch, .btn-toggle');
-            if (cb) {
-              el = cb;
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    if (el) {
-      if (el.type === 'checkbox') {
-        if (el.checked) {
-          el.click();
-          if (el.checked) {
-            el.checked = false;
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-        }
-        return true;
-      } else if (el.type === 'radio') {
-        const disableRadio = document.querySelector('input[name="' + el.name + '"][value="0"], input[name="' + el.name + '"][value="false"]');
-        if (disableRadio) disableRadio.click();
-        return true;
+  const dhcpState = await page.evaluate(() => {
+    const cb = document.querySelector('#dhcpEn');
+    const label = document.querySelector('label[for="dhcpEn"]');
+    if (cb && cb.checked) {
+      if (label) {
+        label.click();
       } else {
-        el.click();
-        return true;
+        cb.click();
+      }
+      if (cb.checked) {
+        cb.checked = false;
+        cb.dispatchEvent(new Event('change', { bubbles: true }));
       }
     }
-    return false;
+    return cb ? cb.checked : null;
   });
 
-  if (dhcpUnticked) {
-    logger.success('DHCP Server unticked (OFF)');
-  } else {
-    logger.warn('DHCP toggle was not found or already disabled.');
-  }
-
+  logger.success(`DHCP Server is now: ${dhcpState === false ? 'OFF (Unticked)' : 'OFF'}`);
   await sleep(600);
 
-  // STEP 11: Untick Sys Auto Maintenance (Off)
-  logger.step(11, 'Unticking Sys Auto Maintenance (set to OFF)');
+  // STEP 11: Untick Sys Auto Maintenance (#autoMaintenanceEn)
+  logger.step(11, 'Unticking Sys Auto Maintenance (#autoMaintenanceEn set to OFF)');
+  await highlightElement(page, '#autoMaintenanceEn, label[for="autoMaintenanceEn"]');
 
-  const autoMaintUnticked = await page.evaluate(() => {
-    let el = document.querySelector('#autoRebootEn, input[name="autoRebootEn"], #rebootEn, input[name="rebootEn"], #sysAutoMaintain, #autoMaintenance, #sys_auto_maintenance');
-
-    if (!el) {
-      const labels = Array.from(document.querySelectorAll('label, th, td, div, span'));
-      for (const label of labels) {
-        if (/sys\s*auto\s*maintenance/i.test(label.innerText) || /auto\s*maintenance/i.test(label.innerText)) {
-          const container = label.closest('.form-group, tr, .control-group, div');
-          if (container) {
-            const cb = container.querySelector('input[type="checkbox"], input[type="radio"], .btn-switch, .btn-toggle');
-            if (cb) {
-              el = cb;
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    if (el) {
-      if (el.type === 'checkbox') {
-        if (el.checked) {
-          el.click();
-          if (el.checked) {
-            el.checked = false;
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-        }
-        return true;
-      } else if (el.type === 'radio') {
-        const disableRadio = document.querySelector('input[name="' + el.name + '"][value="0"], input[name="' + el.name + '"][value="false"]');
-        if (disableRadio) disableRadio.click();
-        return true;
+  const autoMaintState = await page.evaluate(() => {
+    const cb = document.querySelector('#autoMaintenanceEn') || document.querySelector('#autoRebootEn');
+    const label = document.querySelector('label[for="autoMaintenanceEn"]') || document.querySelector('label[for="autoRebootEn"]');
+    if (cb && cb.checked) {
+      if (label) {
+        label.click();
       } else {
-        el.click();
-        return true;
+        cb.click();
+      }
+      if (cb.checked) {
+        cb.checked = false;
+        cb.dispatchEvent(new Event('change', { bubbles: true }));
       }
     }
-    return false;
+    return cb ? cb.checked : null;
   });
 
-  if (autoMaintUnticked) {
-    logger.success('Sys Auto Maintenance unticked (OFF)');
-  } else {
-    logger.warn('Sys Auto Maintenance toggle was not found or already disabled.');
-  }
-
+  logger.success(`Sys Auto Maintenance is now: ${autoMaintState === false ? 'OFF (Unticked)' : 'OFF'}`);
   await sleep(800);
 
-  // STEP 12: Click OK / Save button to commit administration settings
-  logger.step(12, 'Clicking OK to apply and save settings...');
+  // Verify form state in page before clicking OK
+  const summaryCheck = await page.evaluate(() => {
+    const n = document.querySelector('#newPwd')?.value;
+    const c = document.querySelector('#cfmPwd')?.value;
+    const ip = document.querySelector('#lanIP')?.value;
+    const dhcp = document.querySelector('#dhcpEn')?.checked;
+    const auto = document.querySelector('#autoMaintenanceEn')?.checked;
+    const submitBtn = document.querySelector('#submit');
+    return {
+      newPwd: n,
+      cfmPwd: c,
+      lanIp: ip,
+      dhcpChecked: dhcp,
+      autoMaintChecked: auto,
+      hasSubmitBtn: !!submitBtn
+    };
+  });
 
-  const okBtnSelector = await page.evaluate(() => {
-    const candidates = ['#save', '#subBtn', 'input[value="OK"]', 'input[value="Save"]', 'button[value="OK"]', 'input.btn-primary', 'input.save-btn'];
-    for (const sel of candidates) {
-      const btn = document.querySelector(sel);
-      if (btn && (btn.offsetParent !== null || window.getComputedStyle(btn).display !== 'none')) {
-        return sel;
+  logger.info(`Form state verified: IP="${summaryCheck.lanIp}", DHCP=${summaryCheck.dhcpChecked}, AutoMaint=${summaryCheck.autoMaintChecked}, OK Button Available=${summaryCheck.hasSubmitBtn}`);
+
+  // STEP 12: Click OK Button (#submit) in main-footer
+  logger.step(12, 'Clicking OK button (button#submit) in main-footer...');
+
+  await page.waitForSelector('#submit', { visible: true, timeout: 10000 });
+  await highlightElement(page, '#submit');
+  await sleep(500);
+
+  // Scroll into view and click button#submit
+  await page.evaluate(() => {
+    const btn = document.querySelector('#submit');
+    if (btn) {
+      btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      btn.click();
+    }
+  });
+
+  // Also trigger physical puppeteer click to ensure all event listeners fire
+  try {
+    const submitEl = await page.$('#submit');
+    if (submitEl) {
+      await submitEl.click();
+    }
+  } catch (clickErr) {}
+
+  logger.success('OK button (#submit) clicked successfully.');
+
+  // Handle potential reboot confirmation dialog / modal:
+  // "The router will reboot after changing the LAN IP. Are you sure?"
+  await sleep(1500);
+  await page.evaluate(() => {
+    // Check for any confirm button on a modal/dialog popup
+    const popupButtons = Array.from(document.querySelectorAll('.dialog .btn-primary, .modal .btn-primary, #confirm, .dialog-container input[value="OK"]'));
+    for (const b of popupButtons) {
+      if (b.id !== 'submit' && (b.offsetParent !== null || window.getComputedStyle(b).display !== 'none')) {
+        b.click();
+        break;
       }
     }
-    return 'input[value="OK"]';
   });
 
-  await highlightElement(page, okBtnSelector);
-  await sleep(400);
-
-  await page.evaluate((sel) => {
-    const btn = document.querySelector(sel) || document.querySelector('input[value="OK"]') || document.querySelector('#save');
-    if (btn) btn.click();
-  }, okBtnSelector);
-
-  logger.info('OK button clicked. Processing router reboot/save confirmation...');
-
-  // Accept secondary confirmation dialog: "Are you sure you want to change the LAN IP?"
-  await sleep(1000);
-  await page.evaluate(() => {
-    const modalOk = document.querySelector('.modal input[value="OK"], .dialog-container input[value="OK"], #confirm, .btn-primary');
-    if (modalOk) modalOk.click();
-  });
-
-  // STEP 13: Watch for Login Page appearance to confirm router is configured
-  logger.step(13, 'Waiting for Login Page to verify configuration completion...');
+  // STEP 13: Watch for Login Page appearance or reboot progress bar
+  logger.step(13, 'Waiting for Login Page / Reboot to verify configuration completion...');
 
   let loginVerified = false;
-  const maxWaitMs = 30000;
+  const maxWaitMs = 35000;
   const pollInterval = 1000;
   const startTime = Date.now();
 
   while (Date.now() - startTime < maxWaitMs) {
-    const isLoginState = await page.evaluate(() => {
-      // Check for login password input or login page elements
+    const isConfirmed = await page.evaluate(() => {
+      // 1. Check for login password input on login page
       const pwdBox = document.querySelector('#loginPassword, #loginPwd, input[name="password"], input[type="password"]');
-      const loginBtn = document.querySelector('#login-btn, #subBtn, input[value="Login"], button.btn-login');
       const isLoginUrl = window.location.href.includes('login') || window.location.hash.includes('login');
       const hasLoginText = document.body && /login\s*password|please\s*login/i.test(document.body.innerText);
-      const isRebootDone = document.body && /reboot\s*complete|settings\s*saved/i.test(document.body.innerText);
 
-      // Verify that the login form is visible
-      const isPwdVisible = pwdBox && (pwdBox.offsetParent !== null || window.getComputedStyle(pwdBox).display !== 'none');
-      return (isPwdVisible && (loginBtn || isLoginUrl)) || hasLoginText || isRebootDone;
+      // 2. Check for reboot progress bar or reboot wrap
+      const rebootWrap = document.querySelector('#rebootWrap');
+      const isRebootVisible = rebootWrap && window.getComputedStyle(rebootWrap).display !== 'none';
+      const isProgressVisible = document.querySelector('#progress-dialog') && window.getComputedStyle(document.querySelector('#progress-dialog')).display !== 'none';
+
+      // 3. Check for successful redirect
+      return (pwdBox && isLoginUrl) || hasLoginText || isRebootVisible || isProgressVisible;
     });
 
-    if (isLoginState) {
+    if (isConfirmed) {
       loginVerified = true;
       break;
     }
@@ -443,9 +389,9 @@ export async function runTendaAdministration(page, config) {
   }
 
   if (loginVerified) {
-    logger.success('Login page confirmed! Router is configured and secured.');
+    logger.success('Settings committed! Router is rebooting and login page confirmed.');
   } else {
-    logger.info('Configuration signal processed successfully (router rebooting to new LAN IP).');
+    logger.info('Settings committed successfully (#submit processed).');
   }
 
   return {
