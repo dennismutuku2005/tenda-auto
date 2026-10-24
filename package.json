@@ -1,0 +1,26 @@
+{
+  "name": "tenda-auto",
+  "version": "1.0.0",
+  "description": "Puppeteer-based automated configuration engine for Tenda routers",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "tenda-auto": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "mock": "node test/mock-server.js",
+    "test:mock": "node src/index.js --url=http://127.0.0.1:8089/quickset.html"
+  },
+  "keywords": [
+    "tenda",
+    "router",
+    "puppeteer",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "puppeteer": "^24.4.0"
+  }
+}
