@@ -4,9 +4,9 @@ import { colors } from './banner.js';
 
 /**
  * Generate a random LAN IP in the range 192.168.[min-max].1
- * Default: 192.168.10.1 to 192.168.200.1
+ * Range: 192.168.10.1 to 192.168.254.1
  */
-export function generateRandomLanIp(min = 10, max = 200) {
+export function generateRandomLanIp(min = 10, max = 254) {
   const octet3 = Math.floor(Math.random() * (max - min + 1)) + min;
   return `192.168.${octet3}.1`;
 }
@@ -45,7 +45,7 @@ export const logger = {
 /**
  * Print nice summary box
  */
-export function printConfigSummary({ ssid, password, wanType, randomLanIp, targetUrl }) {
+export function printConfigSummary({ ssid, wanType, randomLanIp, targetUrl, loginPassword }) {
   const c = colors;
   const width = 64;
   const line = '─'.repeat(width);
@@ -55,7 +55,7 @@ export function printConfigSummary({ ssid, password, wanType, randomLanIp, targe
   console.log(`  ${c.brightCyan}├${line}┤${c.reset}`);
   
   const printRow = (label, value) => {
-    const text = `  - ${label.padEnd(20)}: ${value}`;
+    const text = `  - ${label.padEnd(22)}: ${value}`;
     const padding = Math.max(0, width - text.length);
     console.log(`  ${c.brightCyan}│${c.reset} ${c.brightWhite}${text}${c.reset}${' '.repeat(padding - 1)}${c.brightCyan}│${c.reset}`);
   };
@@ -64,7 +64,10 @@ export function printConfigSummary({ ssid, password, wanType, randomLanIp, targe
   printRow('Connection Type', wanType === 'dhcp' ? 'Dynamic IP (DHCP)' : wanType);
   printRow('WiFi SSID', ssid);
   printRow('WiFi Security', 'Open (No Password)');
-  printRow('Generated LAN IP', `${randomLanIp} (192.168.10-200.1)`);
+  printRow('Router Login Password', loginPassword || 'auto321');
+  printRow('Target Random LAN IP', `${randomLanIp} (192.168.10-254.1)`);
+  printRow('DHCP Server', 'Disabled (Unticked)');
+  printRow('Sys Auto Maintenance', 'Disabled (Unticked)');
   
   console.log(`  ${c.brightCyan}└${line}┘${c.reset}\n`);
 }
