@@ -55,7 +55,7 @@ export function printConfigSummary({ ssid, password, wanType, randomLanIp, targe
   console.log(`  ${c.brightCyan}├${line}┤${c.reset}`);
   
   const printRow = (label, value) => {
-    const text = `  • ${label.padEnd(20)}: ${value}`;
+    const text = `  - ${label.padEnd(20)}: ${value}`;
     const padding = Math.max(0, width - text.length);
     console.log(`  ${c.brightCyan}│${c.reset} ${c.brightWhite}${text}${c.reset}${' '.repeat(padding - 1)}${c.brightCyan}│${c.reset}`);
   };
@@ -63,7 +63,7 @@ export function printConfigSummary({ ssid, password, wanType, randomLanIp, targe
   printRow('Target URL', targetUrl);
   printRow('Connection Type', wanType === 'dhcp' ? 'Dynamic IP (DHCP)' : wanType);
   printRow('WiFi SSID', ssid);
-  printRow('WiFi Password', password ? '••••••••' : '(None / Open)');
+  printRow('WiFi Security', 'Open (No Password)');
   printRow('Generated LAN IP', `${randomLanIp} (192.168.10-200.1)`);
   
   console.log(`  ${c.brightCyan}└${line}┘${c.reset}\n`);

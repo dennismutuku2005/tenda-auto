@@ -7,7 +7,7 @@ import { logger, sleep } from './utils.js';
  */
 export async function waitForTendaRouter(targetUrl = 'http://192.168.0.1/quickset.html', options = {}) {
   const { maxRetries = 60, retryIntervalMs = 2000 } = options;
-  const spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  const spinnerFrames = ['|', '/', '-', '\\'];
   let frameIndex = 0;
   let attempt = 0;
 
@@ -35,7 +35,6 @@ export async function waitForTendaRouter(targetUrl = 'http://192.168.0.1/quickse
 
       if (res.ok) {
         const text = await res.text();
-        // Verify it contains Tenda quickset page markers
         const isTendaQuickset = text.includes('quickSet') || text.includes('wifiSSID') || text.includes('wanType') || text.includes('logo.png');
         
         process.stdout.write('\r' + ' '.repeat(80) + '\r');

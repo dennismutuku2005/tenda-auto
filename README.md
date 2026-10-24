@@ -1,6 +1,6 @@
 # TENDA AUTO - Router Web Config Automation Engine
 
-A high-speed Node.js + Puppeteer automation CLI designed to configure Tenda routers automatically upon connection.
+A Node.js + Puppeteer automation CLI designed to configure Tenda routers automatically upon connection, featuring a visible Chrome automation window and a clean terminal interface.
 
 ```
   ████████╗███████╗███╗   ██╗██████╗  █████╗      █████╗ ██╗   ██╗████████╗ ██████╗ 
@@ -15,24 +15,27 @@ A high-speed Node.js + Puppeteer automation CLI designed to configure Tenda rout
 
 ## Key Features
 
-1. **Big Stylized Terminal Banner**: Visual Unicode typography and ANSI color styling for a clean command-line experience.
-2. **Automatic Router Plug-in Detection**:
-   - Pings `http://192.168.0.1/quickset.html` continuously with an animated spinner.
-   - Detects the exact moment your router boots or is plugged in via LAN / Wi-Fi.
-3. **Puppeteer Web Engine**:
-   - Switches WAN Connection Type to **Dynamic IP (DHCP)** (`#dhcp`).
-   - Automatically fills in your custom **WiFi Name** (`#wifiSSID`).
-   - Configures or leaves WiFi password open (`#wifiPwd`).
-   - Clicks Save (`#save`) and verifies the `"Saved!"` confirmation response (`#quicksetDoneWrap`).
-4. **Random LAN IP Generator**:
-   - Selects a randomized LAN IP in the subnet range `192.168.10.1` to `192.168.200.1`.
-   - Prepares this parameter for subsequent LAN IP router configuration.
+1. **Prompt-Based WiFi Configuration**:
+   - Asks for WiFi Name (SSID) alone at launch.
+   - No password required (configures open/unprotected network).
+2. **Visible Chrome Web Automation**:
+   - Opens the actual Chrome browser window live on screen.
+   - Smooth pacing (`slowMo: 90ms`) allows you to watch every click and keystroke.
+   - Highlights active form fields on the router page with an outline before interacting.
+3. **Automatic Router Plug-in Detection**:
+   - Continuously checks `http://192.168.0.1/quickset.html`.
+   - Starts configuration the moment the Tenda router is plugged in and online.
+4. **Dynamic IP (DHCP) Setting**:
+   - Selects the Dynamic IP radio button (`#dhcp`).
+5. **Random LAN IP Generator**:
+   - Automatically selects a randomized LAN IP in the subnet range `192.168.10.1` to `192.168.200.1`.
+   - Prepares this parameter for subsequent LAN configuration.
 
 ---
 
 ## Installation
 
-Ensure you have [Node.js](https://nodejs.org/) (v18 or higher) installed:
+Ensure you have [Node.js](https://nodejs.org/) installed:
 
 ```bash
 npm install
@@ -42,39 +45,34 @@ npm install
 
 ## Usage
 
-### 1. Interactive Mode
-Run without arguments. The CLI will ask for your WiFi name:
+### 1. Interactive Prompt (Recommended)
+Run the engine. It will show the big banner and ask for your WiFi name:
 ```bash
 npm start
 ```
-
-### 2. Pass WiFi Name Directly
-```bash
-npm start -- "MyCustomWiFi"
+Terminal prompt:
 ```
-
-### 3. Pass WiFi Name and Password
-```bash
-node src/index.js --ssid="Office_Guest" --pwd="MySecretPassword123"
+> Enter WiFi Name (SSID): MyHomeWiFi
 ```
+Once entered, it detects the router, pops up the visible Chrome window, and automates the configuration!
 
-### 4. Background / Headless Mode
+### 2. Pass Name Directly via CLI Argument
 ```bash
-node src/index.js --ssid="Office_Guest" --headless
+npm start -- "MyHomeWiFi"
 ```
 
 ---
 
 ## Testing with Local Mock Server
 
-You can test the entire workflow without a physical router using the built-in mock server:
+To test the automation and watch Chrome configure the router without needing physical hardware:
 
 1. **Terminal 1** (Start Mock Tenda Server):
    ```bash
    npm run mock
    ```
 
-2. **Terminal 2** (Run Automation against Mock Server):
+2. **Terminal 2** (Run Engine):
    ```bash
    npm run test:mock
    ```
@@ -85,14 +83,14 @@ You can test the entire workflow without a physical router using the built-in mo
 
 ```
 tenda-auto/
-├── .gitignore           # Ignored files (node_modules, logs, etc.)
-├── package.json         # Project manifests and scripts
+├── .gitignore           # Excludes node_modules, logs, etc.
+├── package.json         # Scripts and dependencies
 ├── src/
-│   ├── index.js         # CLI entry point, argument parsing & workflow orchestrator
-│   ├── banner.js        # Unicode banner and ANSI styling
+│   ├── index.js         # CLI entry point, prompts & orchestrator
+│   ├── banner.js        # Unicode ASCII art banner
 │   ├── detector.js      # Plug-in polling and HTTP reachability watcher
-│   ├── browser.js       # Resilient Puppeteer browser launcher (Chromium/Chrome/Edge)
-│   ├── engine.js        # Tenda QuickSet DOM automation engine
+│   ├── browser.js       # Puppeteer visible Chrome launcher
+│   ├── engine.js        # Tenda QuickSet DOM automation with element highlighting
 │   └── utils.js         # Random IP generator, prompts, styling helpers
 └── test/
     └── mock-server.js   # Local Tenda QuickSet simulation server

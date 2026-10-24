@@ -2,27 +2,44 @@ import { logger, sleep } from './utils.js';
 import { colors } from './banner.js';
 
 /**
- * Automates the Tenda QuickSet configuration page
- * @param {import('puppeteer').Page} page
- * @param {Object} config
- * @param {string} config.wifiSSID - The WiFi network name
- * @param {string} [config.wifiPwd] - Optional WiFi password
- * @param {string} [config.wanType='dhcp'] - Connection type: 'dhcp', 'pppoe', or 'static'
- * @param {string} [config.randomLanIp] - Generated LAN IP for subsequent steps
- * @param {string} [config.targetUrl] - URL of quickset page
+ * Visually highlight an element on the router web page before interacting with it
+ */
+async function highlightElement(page, selector) {
+  try {
+    await page.evaluate((sel) => {
+      document.querySelectorAll('.tenda-auto-highlight').forEach((el) => {
+        el.style.outline = '';
+        el.style.boxShadow = '';
+      });
+
+      const el = document.querySelector(sel);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.outline = '3px solid #0284c7';
+        el.style.outlineOffset = '3px';
+        el.style.boxShadow = '0 0 14px rgba(2, 132, 199, 0.7)';
+        el.classList.add('tenda-auto-highlight');
+      }
+    }, selector);
+  } catch (e) {
+    // Ignore highlight errors if DOM is navigating
+  }
+}
+
+/**
+ * Automates the Tenda QuickSet configuration inside the visible Chrome window
  */
 export async function runTendaQuickset(page, config) {
   const {
     wifiSSID,
-    wifiPwd = '',
     wanType = 'dhcp',
     randomLanIp,
     targetUrl = 'http://192.168.0.1/quickset.html'
   } = config;
 
-  logger.step(1, `Navigating to Tenda Quickset Page (${targetUrl})`);
+  logger.step(1, `Navigating Chrome to Tenda Quickset Page: ${targetUrl}`);
 
-  // Handle any native alert / confirm dialogs that router firmware might show
+  // Auto-accept any browser alerts from the router firmware
   page.on('dialog', async (dialog) => {
     logger.warn(`Router dialog encountered: "${dialog.message()}". Accepting...`);
     await dialog.accept();
@@ -34,7 +51,7 @@ export async function runTendaQuickset(page, config) {
       timeout: 30000
     });
   } catch (navErr) {
-    logger.warn(`Direct networkidle2 timed out, attempting load state check: ${navErr.message}`);
+    logger.warn(`Direct networkidle2 timed out, checking loaded DOM: ${navErr.message}`);
   }
 
   // Ensure quickSetWrap form or elements exist
@@ -43,80 +60,64 @@ export async function runTendaQuickset(page, config) {
     visible: true,
     timeout: 15000
   });
-  logger.success('Quickset interface loaded successfully');
+  logger.success('Quickset interface loaded in Chrome');
+
+  await sleep(600);
 
   // STEP 3: Configure WAN Connection Type (Dynamic IP / DHCP)
-  logger.step(3, `Setting WAN Connection Type to "${wanType.toUpperCase()}" (Dynamic IP)`);
-  
+  logger.step(3, `Selecting Connection Type: Dynamic IP (DHCP)`);
+  await highlightElement(page, '#dhcp, label[for="dhcp"]');
+  await sleep(400);
+
   await page.evaluate((type) => {
-    // Locate the dynamic IP radio
     const radio = document.querySelector(`#${type}`) || document.querySelector(`input[name="wanType"][value="${type}"]`);
     if (radio) {
       radio.checked = true;
       radio.dispatchEvent(new Event('change', { bubbles: true }));
       radio.dispatchEvent(new Event('click', { bubbles: true }));
     }
-    
-    // Also trigger label click to activate Tenda's UI visibility scripts
     const label = document.querySelector(`label[for="${type}"]`);
-    if (label) {
-      label.click();
-    }
+    if (label) label.click();
   }, wanType);
 
-  await sleep(600);
+  await sleep(700);
   logger.success('Connection type selected: Dynamic IP (DHCP)');
 
   // STEP 4: Configure WiFi SSID
-  logger.step(4, `Configuring WiFi Name (SSID) -> "${wifiSSID}"`);
-  
+  logger.step(4, `Entering WiFi Name: "${wifiSSID}"`);
+  await highlightElement(page, '#wifiSSID');
+  await sleep(300);
+
   const ssidInput = await page.$('#wifiSSID');
   if (!ssidInput) {
     throw new Error('WiFi SSID input field (#wifiSSID) not found on page.');
   }
 
-  // Clear existing SSID and type the new one
+  // Focus, clear existing text, and type new SSID visibly
   await ssidInput.click({ clickCount: 3 });
   await page.keyboard.press('Backspace');
-  await ssidInput.type(wifiSSID, { delay: 40 });
+  await ssidInput.type(wifiSSID, { delay: 60 });
 
-  // STEP 5: Configure WiFi Password (if provided)
+  // Ensure password field is left empty / cleared
   const pwdInput = await page.$('#wifiPwd');
   if (pwdInput) {
     await pwdInput.click({ clickCount: 3 });
     await page.keyboard.press('Backspace');
-    if (wifiPwd && wifiPwd.trim().length > 0) {
-      logger.step(5, `Configuring WiFi Password`);
-      await pwdInput.type(wifiPwd, { delay: 40 });
-      logger.success('WiFi password entered.');
-    } else {
-      logger.info('WiFi Password left blank / open.');
-    }
   }
 
-  await sleep(500);
+  await sleep(600);
 
-  // Validate form state before saving
-  const inputValues = await page.evaluate(() => {
-    const ssid = document.querySelector('#wifiSSID')?.value;
-    const dhcpChecked = document.querySelector('#dhcp')?.checked;
-    return { ssid, dhcpChecked };
-  });
+  // STEP 5: Commit and Save
+  logger.step(5, 'Clicking Save button (#save)');
+  await highlightElement(page, '#save, input.save-btn');
+  await sleep(400);
 
-  logger.info(`Form state before commit: SSID="${inputValues.ssid}", DynamicIP=${inputValues.dhcpChecked}`);
-
-  // STEP 6: Commit and Save
-  logger.step(6, 'Submitting Quickset configuration (#save)');
   const saveBtn = await page.$('#save, input.save-btn');
   if (!saveBtn) {
     throw new Error('Save button (#save) not found on page.');
   }
 
-  await Promise.all([
-    saveBtn.click(),
-    sleep(1500)
-  ]);
-
+  await saveBtn.click();
   logger.info('Save button clicked. Waiting for router confirmation...');
 
   // Wait for confirmation container or completion indicator
@@ -130,7 +131,7 @@ export async function runTendaQuickset(page, config) {
     }, { timeout: 12000 });
     logger.success('Router accepted configuration and displayed "Saved!" confirmation.');
   } catch (waitErr) {
-    logger.info('Router response received (Save signal sent successfully).');
+    logger.info('Save signal sent to router successfully.');
   }
 
   // Prepared for LAN IP automation (Step 2)
@@ -139,6 +140,9 @@ export async function runTendaQuickset(page, config) {
     logger.bullet('Target Random LAN IP', randomLanIp);
     logger.info('Ready for LAN IP change once administration page details are provided.');
   }
+
+  // Pause briefly so the user can see the final state in the Chrome window
+  await sleep(3000);
 
   return {
     success: true,

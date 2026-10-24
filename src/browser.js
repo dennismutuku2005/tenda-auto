@@ -2,54 +2,44 @@ import puppeteer from 'puppeteer';
 import { logger } from './utils.js';
 
 /**
- * Launch Puppeteer browser instance with sensible router-automation defaults
- * and fallback to system Chrome/Edge if needed.
+ * Launch visible Chrome browser window so the user can watch
+ * the live web automation directly on their screen.
  */
 export async function launchBrowser(options = {}) {
-  const { headless = false } = options;
+  const { slowMo = 90 } = options;
 
   const defaultArgs = [
     '--no-sandbox',
     '--disable-setuid-sandbox',
     '--disable-dev-shm-usage',
     '--disable-web-security',
-    '--ignore-certificate-errors',
     '--window-size=1280,850'
   ];
 
-  logger.info(`Launching browser engine (headless: ${headless})...`);
+  logger.info(`Opening visible Chrome window (live automation mode)...`);
+
+  const launchConfig = {
+    headless: false,       // Always visible browser window
+    slowMo,                // Paced interaction so user sees each click and keystroke
+    defaultViewport: null, // Uses the actual browser window size
+    args: defaultArgs
+  };
 
   try {
-    // 1. Try default Puppeteer launch
-    const browser = await puppeteer.launch({
-      headless: headless ? 'shell' : false,
-      defaultViewport: { width: 1280, height: 800 },
-      args: defaultArgs
-    });
-    return browser;
+    return await puppeteer.launch(launchConfig);
   } catch (err) {
-    logger.warn(`Default Puppeteer launch failed (${err.message}). Trying system Chrome channel...`);
-    
-    // 2. Try Chrome channel
+    logger.warn(`Default Puppeteer browser launch note: ${err.message}. Trying system Chrome...`);
     try {
-      const browser = await puppeteer.launch({
-        channel: 'chrome',
-        headless: headless ? 'shell' : false,
-        defaultViewport: { width: 1280, height: 800 },
-        args: defaultArgs
+      return await puppeteer.launch({
+        ...launchConfig,
+        channel: 'chrome'
       });
-      return browser;
     } catch (chromeErr) {
-      logger.warn(`Chrome channel failed. Trying Microsoft Edge channel...`);
-      
-      // 3. Try Edge channel
-      const browser = await puppeteer.launch({
-        channel: 'msedge',
-        headless: headless ? 'shell' : false,
-        defaultViewport: { width: 1280, height: 800 },
-        args: defaultArgs
+      logger.warn(`Trying Microsoft Edge as fallback...`);
+      return await puppeteer.launch({
+        ...launchConfig,
+        channel: 'msedge'
       });
-      return browser;
     }
   }
 }
