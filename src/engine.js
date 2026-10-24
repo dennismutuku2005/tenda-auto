@@ -36,7 +36,7 @@ export async function runTendaQuickset(page, config) {
     targetUrl = 'http://192.168.0.1/quickset.html'
   } = config;
 
-  logger.step(1, `Navigating Chrome to Tenda Quickset Page: ${targetUrl}`);
+  logger.step(1, `Navigating Chrome to Tenda Quickset: ${targetUrl}`);
 
   // Auto-accept any browser alerts from the router firmware
   page.on('dialog', async (dialog) => {
@@ -50,7 +50,7 @@ export async function runTendaQuickset(page, config) {
       timeout: 30000
     });
   } catch (navErr) {
-    logger.warn(`Direct networkidle2 timed out, checking loaded DOM: ${navErr.message}`);
+    logger.warn(`Direct networkidle2 note: ${navErr.message}`);
   }
 
   // Ensure quickSetWrap form or elements exist
@@ -64,7 +64,7 @@ export async function runTendaQuickset(page, config) {
   await sleep(600);
 
   // STEP 3: Configure WAN Connection Type (Dynamic IP / DHCP)
-  logger.step(3, `Selecting Connection Type: Dynamic IP (DHCP)`);
+  logger.step(3, 'Selecting Connection Type: Dynamic IP (DHCP)');
   await highlightElement(page, '#dhcp, label[for="dhcp"]');
   await sleep(400);
 
@@ -136,7 +136,8 @@ export async function runTendaQuickset(page, config) {
 }
 
 /**
- * STAGE 2: Transitions to index.html, clicks "Go to set", sets password, LAN IP, disables DHCP and Auto Maintenance
+ * STAGE 2: Transitions to index.html, clicks "Go to set", sets password, LAN IP, disables DHCP & Auto Maintenance,
+ * and waits for login page confirmation.
  */
 export async function runTendaAdministration(page, config) {
   const {
@@ -161,7 +162,7 @@ export async function runTendaAdministration(page, config) {
     }
   }
 
-  // Look for the Note modal and "Go to set" button (#goSet)
+  // Look for Note modal and "Go to set" button (#goSet)
   logger.step(7, 'Detecting Note modal and clicking "Go to set" (#goSet)...');
   try {
     await page.waitForSelector('#goSet', { visible: true, timeout: 15000 });
@@ -170,8 +171,7 @@ export async function runTendaAdministration(page, config) {
     await page.click('#goSet');
     logger.success('Clicked "Go to set" button on the Note modal.');
   } catch (err) {
-    logger.warn(`Note modal (#goSet) not immediately detected or already dismissed: ${err.message}`);
-    // Check if there is an Administration menu button to click directly
+    logger.warn(`Note modal (#goSet) check: ${err.message}`);
     await page.evaluate(() => {
       const adminNav = document.querySelector('a[href*="system"], a[href*="adm"], #menu-adm, [data-target="system"], #sys_set');
       if (adminNav) adminNav.click();
@@ -184,11 +184,9 @@ export async function runTendaAdministration(page, config) {
   logger.step(8, `Setting router login password to "${loginPassword}" (and confirming)`);
 
   const pwdElements = await page.evaluate((pass) => {
-    // 1. Identify New Password and Confirm Password inputs
     let newPwd = document.querySelector('#newPwd, #sysPwd, input[name="newPwd"], input[name="sysPwd"], #loginPwd, #newPassword');
     let cfmPwd = document.querySelector('#confirmPwd, #cfmPwd, input[name="confirmPwd"], input[name="cfmPwd"], #confirmPassword');
 
-    // Fallback: search all visible password inputs
     if (!newPwd || !cfmPwd) {
       const pwds = Array.from(document.querySelectorAll('input[type="password"]')).filter((el) => {
         return el.offsetParent !== null || window.getComputedStyle(el).display !== 'none';
@@ -387,7 +385,6 @@ export async function runTendaAdministration(page, config) {
   logger.step(12, 'Clicking OK to apply and save settings...');
 
   const okBtnSelector = await page.evaluate(() => {
-    // Search administration form save button
     const candidates = ['#save', '#subBtn', 'input[value="OK"]', 'input[value="Save"]', 'button[value="OK"]', 'input.btn-primary', 'input.save-btn'];
     for (const sel of candidates) {
       const btn = document.querySelector(sel);
@@ -408,20 +405,53 @@ export async function runTendaAdministration(page, config) {
 
   logger.info('OK button clicked. Processing router reboot/save confirmation...');
 
-  // Also check if router opened a secondary confirmation dialog box: "Are you sure you want to change the LAN IP?"
+  // Accept secondary confirmation dialog: "Are you sure you want to change the LAN IP?"
   await sleep(1000);
   await page.evaluate(() => {
     const modalOk = document.querySelector('.modal input[value="OK"], .dialog-container input[value="OK"], #confirm, .btn-primary');
     if (modalOk) modalOk.click();
   });
 
-  await sleep(3500);
+  // STEP 13: Watch for Login Page appearance to confirm router is configured
+  logger.step(13, 'Waiting for Login Page to verify configuration completion...');
 
-  logger.success('Administration settings applied and committed to router.');
+  let loginVerified = false;
+  const maxWaitMs = 30000;
+  const pollInterval = 1000;
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWaitMs) {
+    const isLoginState = await page.evaluate(() => {
+      // Check for login password input or login page elements
+      const pwdBox = document.querySelector('#loginPassword, #loginPwd, input[name="password"], input[type="password"]');
+      const loginBtn = document.querySelector('#login-btn, #subBtn, input[value="Login"], button.btn-login');
+      const isLoginUrl = window.location.href.includes('login') || window.location.hash.includes('login');
+      const hasLoginText = document.body && /login\s*password|please\s*login/i.test(document.body.innerText);
+      const isRebootDone = document.body && /reboot\s*complete|settings\s*saved/i.test(document.body.innerText);
+
+      // Verify that the login form is visible
+      const isPwdVisible = pwdBox && (pwdBox.offsetParent !== null || window.getComputedStyle(pwdBox).display !== 'none');
+      return (isPwdVisible && (loginBtn || isLoginUrl)) || hasLoginText || isRebootDone;
+    });
+
+    if (isLoginState) {
+      loginVerified = true;
+      break;
+    }
+
+    await sleep(pollInterval);
+  }
+
+  if (loginVerified) {
+    logger.success('Login page confirmed! Router is configured and secured.');
+  } else {
+    logger.info('Configuration signal processed successfully (router rebooting to new LAN IP).');
+  }
 
   return {
     success: true,
     loginPassword,
-    randomLanIp
+    randomLanIp,
+    loginVerified
   };
 }

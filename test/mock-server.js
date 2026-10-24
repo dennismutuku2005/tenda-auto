@@ -218,6 +218,11 @@ const indexContent = `<!DOCTYPE html>
       document.getElementById('adminForm').style.display = 'none';
       document.getElementById('rebootSuccess').classList.remove('none');
       document.getElementById('newLanNotice').innerText = 'New LAN IP: ' + newIp + ' | DHCP: ' + (dhcp ? 'ON' : 'OFF') + ' | Auto Maint: ' + (autoReboot ? 'ON' : 'OFF');
+
+      // Show login form after brief delay
+      setTimeout(function() {
+        document.getElementById('rebootSuccess').innerHTML = '<h2>Router Login</h2><div style="margin: 20px 0;"><input type="password" id="loginPassword" class="form-control" placeholder="Please enter login password" style="width: 250px; margin: 0 auto; display: block;"></div><button id="login-btn" class="btn btn-primary">Login</button>';
+      }, 1500);
     });
   </script>
 </body>

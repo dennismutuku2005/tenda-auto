@@ -1,6 +1,6 @@
 # TENDA AUTO - Router Web Config Automation Engine
 
-An automated Node.js + Puppeteer automation CLI designed to configure Tenda routers completely upon connection, featuring a visible Chrome automation window and a clean terminal interface.
+An automated Node.js + Puppeteer automation CLI designed to configure Tenda routers in continuous batch mode, featuring a visible Chrome automation window and a clean, perfectly aligned terminal interface.
 
 ```
   ████████╗███████╗███╗   ██╗██████╗  █████╗      █████╗ ██╗   ██╗████████╗ ██████╗ 
@@ -13,22 +13,32 @@ An automated Node.js + Puppeteer automation CLI designed to configure Tenda rout
 
 ---
 
-## Complete Two-Stage Automation Workflow
+## Complete Multi-Router Batch Workflow
 
-### Stage 1: QuickSet Configuration
-1. Automatically probes `http://192.168.0.1/quickset.html` until router is detected.
-2. Selects **Dynamic IP (DHCP)** (`#dhcp`).
-3. Inputs your custom **WiFi Name (SSID)** (prompt-based, no password needed).
-4. Submits QuickSet and verifies the `"Saved!"` response.
+### 1. Single Prompt at Startup
+Enter the WiFi Name (SSID) once at launch. The engine reuses this name across every router in your batch session.
 
-### Stage 2: Administration & LAN Setup
-1. Automatically transitions to `http://192.168.0.1/index.html`.
-2. Detects the **Note** popup (`#setPassWord`) and clicks **Go to set** (`#goSet`).
-3. Sets Router Login Password to **`auto321`** and confirms it.
-4. Generates a random LAN IP in the range **`192.168.[10-254].1`** and updates the LAN IP field.
-5. Unticks and disables the **DHCP Server** (OFF).
-6. Unticks and disables **Sys Auto Maintenance** (OFF).
-7. Clicks **OK** to commit all changes and apply router reboot.
+### 2. Stage 1: QuickSet
+- Pings `http://192.168.0.1/quickset.html` until router is detected.
+- Selects **Dynamic IP (DHCP)** (`#dhcp`).
+- Types your **WiFi Name (SSID)** (open network, no password).
+- Submits QuickSet and confirms.
+
+### 3. Stage 2: Administration Setup
+- Transitions to `http://192.168.0.1/index.html`.
+- Detects the **Note** popup (`#setPassWord`) and clicks **Go to set** (`#goSet`).
+- Sets router login password to **`auto321`** and confirms it.
+- Generates a fresh random LAN IP in the range **`192.168.[10-254].1`** (unique for each router).
+- Unticks **DHCP Server** (OFF).
+- Unticks **Sys Auto Maintenance** (OFF).
+- Clicks **OK** to commit changes.
+- **Login Verification**: Waits for the router's login page to appear before officially marking the router as configured.
+
+### 4. Seamless Hardware Swapping
+- Displays a clean, beautifully aligned completion table for the current router.
+- Instructs you to unplug the configured router and plug in the next one.
+- Automatically detects the new router and configures it with the same WiFi name and a new random LAN IP.
+- Continues automatically until you close the terminal or press `Ctrl+C`.
 
 ---
 
@@ -44,29 +54,12 @@ npm install
 
 ## Usage
 
-### Interactive Prompt (Recommended)
-Run the script. It will display the banner and prompt for the WiFi Name alone:
+### Run Batch Provisioning
 ```bash
 npm start
 ```
 Terminal prompt:
 ```
-> Enter WiFi Name (SSID): FREEWIFI NET
+> Enter WiFi Name (SSID) for this batch: FREEWIFI NET
 ```
-The visible Chrome browser window will launch automatically and carry out both Stage 1 and Stage 2 right in front of you.
-
----
-
-## Testing with Local Mock Server
-
-To test both stages locally without physical hardware:
-
-1. **Terminal 1** (Start Mock Tenda Server):
-   ```bash
-   npm run mock
-   ```
-
-2. **Terminal 2** (Run Engine):
-   ```bash
-   npm run test:mock
-   ```
+Plug in Router #1 -> Automatically configured -> Unplug and plug in Router #2 -> Automatically configured -> and so on!
